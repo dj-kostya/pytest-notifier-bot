@@ -1,19 +1,18 @@
-import json
 import pytest
 import pandas as pd
 
 
-def parse(path):
+def parse(my_path):
 
-    pytest.main(["--json-report", "pytest"])
-    data = pd.read_json(".report.json", lines=True, encoding = "utf8")
+    pytest.main(["--json-report", f"--rootdir={my_path}"])
+    data = pd.read_json(".report.json", lines=True, encoding="utf8")
     result = ""
     for test in range(len(data['tests'][0])):
         if data['tests'][0][test]['outcome'] == 'failed':
-            text = f"""🔴***Failed!***
-***Test:*** 
+            text = f"""🔴Failed!
+Test: 
 \t{data['tests'][0][test]['call']['crash']['path']}
-***Comment:*** 
+Comment: 
 \t{data['tests'][0][test]['call']['longrepr']}
 
         
@@ -25,10 +24,7 @@ def parse(path):
     return 0, result
 
 
-
-
-
 if __name__ == '__main__':
-    result = parse("pytest/")
+    res = parse("pytest/")
     print("____________________")
-    print(result)
+    print(res)

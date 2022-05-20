@@ -1,5 +1,0 @@
-Test,Result,Comments
-pytest/ch1/test_two.py::test_failing,Failed,"def test_failing():> assert (1, 2, 3) == (3, 2, 3)E assert (1, 2, 3) == (3, 2, 3)E At index 0 diff: 1 != 3E Use -v to get more diffpytest\ch1\test_two.py:2: AssertionError"
-pytest/ch1/test_one.py::test_passing,Passed,-
-pytest/ch1/test_three.py::test_defaults,Passed,-
-pytest/ch1/test_three.py::test_member_access,Passed,-

@@ -1,7 +1,8 @@
 # Imports
-import numpy as np
-
-from model import get_test_result
+import tempfile
+from os import path
+from pytest_handling import tests_passed, parse_results
+from json_parser import parse
 
 from config import TOKEN
 
@@ -14,22 +15,16 @@ import asyncio
 from create_db import create_database
 from sqlite import SQLiteDatabase
 
-from io import BytesIO
-
-from aiogram import Bot, Dispatcher, executor, types
+from aiogram import Bot, Dispatcher, types
 from aiogram.dispatcher import FSMContext
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from aiogram.dispatcher.filters import Command, Text
 
-# Hyper-parameters
-T = 60  # Check image from camera for defects every T seconds
-database_name = "test.db"  # Input your database filename
-Q = 0.65  # Threshold for defects probability
-CONNECT_ERRORS_THRESH = 3  # If stream connection errors is greater than thresh then stop bot
 
+T = 5  # Bot sleep time
+database_name = "test.db"
 # Bot setting
-logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot, storage=MemoryStorage())
 dp.middleware.setup(LoggingMiddleware())
@@ -46,22 +41,22 @@ async def show_menu(message: types.Message):
     text = """
 Hi!
 
-Once you start the stream I will update you when you want ⏱
-When a defect occurs I will notify you immediately 🖨️
+Once you start testing I will update you when you want ⏱
+When a failure occurs I will notify you immediately 🖨️
 
 The steps to *start* bot: 🏁
 --------------------------------------------------------
-• ***Connect stream*** - connects your stream link 🌐
+• ***Set up path*** - gives bot your path to pytest folder 🌐
 
-• ***Edit notifications period*** - every _<input>_ seconds get images with predictions _(600 by default)_ ♾️
+• ***Edit notifications period*** - every _<input>_ seconds get response _(600 by default)_ ♾️
 
-• ***Edit defects period*** - every _<input>_ seconds get images with "alerted" defects predictions if they occur _(30 by default)_ 🔁
+• ***Edit fails period*** - every _<input>_ seconds get messages if tests failed _(30 by default)_ 🔁
 
-• ***Watch stream*** - start defects detection & getting updates 📺
+• ***Start testing*** - start checking tests & getting updates 📺
 """
 
     await message.answer(text, parse_mode='Markdown')
-    await message.answer("To connect the stream click the button below🔽", reply_markup=set_up_path)
+    await message.answer("To set up the path click the button below🔽", reply_markup=set_up_path)
 
 
 # Help command handler
@@ -70,79 +65,86 @@ async def process_start_command(message: types.Message):
     text = """
 The steps to start bot: 🏁
 --------------------------------------------------------
-• ***Connect stream*** - connects your stream link 🌐
+• ***Set up path*** - gives bot your path to pytest folder 🌐
 
-• ***Edit notifications period*** - every _<input>_ seconds get images with predictions _(600 by default)_ ♾️
+• ***Edit notifications period*** - every _<input>_ seconds get response _(600 by default)_ ♾️
 
-• ***Edit defects period*** - every _<input>_ seconds get images with "alerted" defects predictions if they occur _(30 by default)_ 🔁
+• ***Edit fails period*** - every _<input>_ seconds get messages if tests failed _(30 by default)_ 🔁
 
-• ***Watch stream*** - start defects detection & getting updates 📺
+• ***Start testing*** - start checking tests & getting updates 📺
 --------------------------------------------------------
 
 
-Commands inside ***Watch stream***:
+Commands inside ***Start testing***:
 --------------------------------------------------------
-• ***Unmute defects notifications*** - unmutes defects detection if muted _(unmuted by default)_ 🔊
+• ***Unmute failures notifications*** - unmutes failures detection if muted _(unmuted by default)_ 🔊
 
-• ***Mute defects notifications*** - mutes defects detection if not muted 🔇
+• ***Mute failures notifications*** - mutes failures detection if not muted 🔇
 
-• ***Get only scheduled notifications*** - turn off alert defects updates 📅
+• ***Get only scheduled notifications*** - turn off alert failures updates 📅
 
 • ***Get all notifications*** - get all updates _(all by default)_ 🔔
 
-• ***Stop stream*** - stop getting updates 🎬
+• ***Stop testing*** - stop getting updates 🎬
 --------------------------------------------------------
 
 Enjoy 🍿
     """
 
     await message.reply(text, parse_mode="Markdown")
-    await message.answer("To set the stream click one of the buttons below🔽", reply_markup=rewritePath_editPeriods_testing_help)
+    await message.answer("To set the path click one of the buttons below🔽", reply_markup=rewritePath_editPeriods_testing_help)
 
 
-# Connect stream command & user registration in db
-@dp.message_handler(Text(equals=["Connect stream", "Reconnect stream", "/connect_stream"]))
+
+
+# Set up path command & user registration in db
+@dp.message_handler(Text(equals=["Set up path", "Reset path"]))
 async def cmd_dialog_stream(message: types.Message):
     await PytestPath.pytest_path.set()  # states start working
-    await message.reply("Input the link to your stream: ", reply=False)
+    await message.reply("Input the path to your pytest folder: ", reply=False)
 
 
 @dp.message_handler(state=PytestPath.pytest_path)
-async def stream(message: types.Message, state: FSMContext):
+async def testing(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['text'] = message.text
-        stream_link = data['text']
-        print(stream_link)  # as log
+        pytest_path = data['text']
+        print(pytest_path)  # as log
 
-        # Check if stream active, if not - reconnect or watch previous successfully connected stream
-        cap = cv2.VideoCapture(stream_link)
-        ret, frame = cap.read()
-        if not ret or frame is None:
+        if not path.exists(pytest_path):
             await message.answer(
-                "Stream is not connected, something went wrong...", disable_notification=False, reply_markup=rewritePath_editPeriods_testing_help)
+                "Path is invalid...", disable_notification=False,
+                reply_markup=rewritePath_editPeriods_testing_help)
             dp.current_state(user=message.from_user.id)
             await state.reset_state()
 
         else:
+            # Check if path valid, if not - reset path or test previous successfully set path
             if not db.user_exists(message.from_user.id):
                 # if user not in db then add it
-                db.add_user(user_id=message.from_user.id, status=False, path=stream_link)
+                db.add_user(user_id=message.from_user.id, status=False, my_path=pytest_path)
             else:
                 # if user already in db then update it
-                db.update_path(user_id=message.from_user.id, status=False, path=stream_link)
+                db.update_path(user_id=message.from_user.id, status=False, my_path=pytest_path)
 
-            # Stream successfully connected
+            # Path successfully set
             await message.answer(
-                "Stream link is active...", reply_markup=rewritePath_editPeriods_testing_help)
+                "Path successfully set...", reply_markup=rewritePath_editPeriods_testing_help)
 
             # Close state
             dp.current_state(user=message.from_user.id)
             await state.reset_state()
 
 
-# Start stream command
-@dp.message_handler(Text(equals=["Watch stream", "/watch"]))
-async def subscribe(message: types.Message):
+
+# Start testing command
+@dp.message_handler(Text(equals=["Start testing"]))
+async def start_testing(message: types.Message):
+    if not path.exists(db.get_user_path(message.from_user.id)):
+        await message.answer(
+            "Path is invalid...", disable_notification=False,
+            reply_markup=rewritePath_editPeriods_testing_help)
+
     if not db.user_exists(message.from_user.id):
         # if user not in db then add it
         db.add_user(user_id=message.from_user.id, status=True)
@@ -152,32 +154,32 @@ async def subscribe(message: types.Message):
         db.update_status(user_id=message.from_user.id, status=True)
 
     await message.answer(
-        "Stream starting...")
-    await message.answer("Now you will get periodical notifications and defects messages when they occur!")
-    await message.answer("To modify the stream click one of the buttons below🔽",
+        "Checking tests starting...")
+    await message.answer("Now you will get periodical notifications and messages about tests failure if it occurs!")
+    await message.answer("To modify the process click one of the buttons below🔽",
                          reply_markup=testing_managing)
 
 
-# Stop stream command
-@dp.message_handler(Text(equals=["Stop stream", "/stop"]))
-async def unsubscribe(message: types.Message):
+# Stop testing command
+@dp.message_handler(Text(equals=["End testing"]))
+async def stop_testing(message: types.Message):
     if not db.user_exists(message.from_user.id):
         # if user not in db then just write it to db with non-active status
         db.add_user(user_id=message.from_user.id, status=False)
-        await message.answer("You are not watching stream yet!", disable_notification=False)
+        await message.answer("The tests are not checking yet!", disable_notification=False)
 
     else:
         # if user in db then update his status to non-active
         db.update_status(user_id=message.from_user.id, status=False)
-
-        await message.answer("Stopping stream...", reply_markup=rewritePath_editPeriods_testing_help)
+        await message.answer("Testing is being stopped...", reply_markup=rewritePath_editPeriods_testing_help)
 
 
 # Set notification period & user registration in db
-@dp.message_handler(Text(equals=["Notification period", "/notification_period", "Edit notifications period"]))
+@dp.message_handler(Text(equals=["Edit notifications period"]))
 async def cmd_dialog_notifications(message: types.Message):
-    await Notification.notifications_period.set()  # вот мы указали начало работы состояний (states)
-    await message.reply("Every N seconds you will get the notification independently on result\nInput N: ", reply=False)
+    await Notification.notifications_period.set()
+    await message.reply("Every N seconds you will get the notification independently on tests result\nInput N: ", reply=False)
+
 
 @dp.message_handler(state=Notification.notifications_period)
 async def notification_period(message: types.Message, state: FSMContext):
@@ -189,10 +191,7 @@ async def notification_period(message: types.Message, state: FSMContext):
             if time < T or time > 20000:
 
                 # if time input is integer but less than update period
-
-                text = f"""
-Defects period is not updated. Please, input the integer in range 
-_[{T}; 20000]_"""
+                text = f'Failure period is not updated. Please, input the integer in range _[{T}; 20000]_'
 
                 await message.answer(
                     text=text,
@@ -228,14 +227,15 @@ _[{T}; 20000]_"""
             await state.reset_state()
 
 
-# set defects period plus user registration in db
-@dp.message_handler(Text(equals=["Defects period", "/defects_period", "Edit defects period"]))
+# Set failure period & user registration in db
+@dp.message_handler(Text(equals=["Edit failure period"]))
 async def cmd_dialog_defects(message: types.Message):
-    await Failure.failure_period.set()  # вот мы указали начало работы состояний (states)
-    await message.reply("Once you get defects notification, you will get it every K seconds\nInput K: ", reply=False)
+    await Failure.failure_period.set()
+    await message.reply("Once you get failure notification, you will get it every K seconds\nInput K: ", reply=False)
+
 
 @dp.message_handler(state=Failure.failure_period)
-async def defect_period(message: types.Message, state: FSMContext):
+async def failure_period(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['text'] = message.text
         time = data['text']
@@ -246,10 +246,8 @@ async def defect_period(message: types.Message, state: FSMContext):
             if time < T or time > 20000:
 
                 # if time input is integer but less than update period
+                text = f'Failure period is not updated. Please, input the integer in range _[{T}; 20000]_'
 
-                text = f"""
-Defects period is not updated. Please, input the integer in range 
-_[{T}; 20000]_"""
                 await message.answer(
                     text=text,
                     reply_markup=rewritePath_editPeriods_testing_help, parse_mode="Markdown")
@@ -270,7 +268,7 @@ _[{T}; 20000]_"""
                                               failures_period=time)
 
                 await message.answer(
-                    "Defects period is updated...", reply_markup=rewritePath_editPeriods_testing_help)
+                    "Failure period is updated...", reply_markup=rewritePath_editPeriods_testing_help)
 
                 dp.current_state(user=message.from_user.id)
                 await state.reset_state()
@@ -279,46 +277,46 @@ _[{T}; 20000]_"""
 
             # if time input cannot be converted to integer
             await message.answer(
-                "Defects period is not updated. Please, input the integer...",
+                "Failure period is not updated. Please, input the integer...",
                 reply_markup=rewritePath_editPeriods_testing_help)
             dp.current_state(user=message.from_user.id)
             await state.reset_state()
 
 
-# Mute alert notifications (prob >= Q) command
-@dp.message_handler(Text(equals=["Mute defects notifications", "/mute_defects_notifications"]))
+# Mute failure notifications command
+@dp.message_handler(Text(equals=["Mute failure notifications"]))
 async def mute(message: types.Message):
 
     db.update_mute(user_id=message.from_user.id, failure_mute=True)
     await message.answer(
-        "Now your notifications are muted...", reply_markup=testing_managing)
+        "Now failure notifications are muted...", reply_markup=testing_managing)
 
 
 # Unmute alert notifications command
-@dp.message_handler(Text(equals=["Unmute defects notifications", "/unmute_defects_notifications"]))
+@dp.message_handler(Text(equals=["Unmute failure notifications"]))
 async def unmute(message: types.Message):
 
     db.update_mute(user_id=message.from_user.id, failure_mute=False)
     await message.answer(
-        "Now your notifications are loud...", reply_markup=testing_managing)
+        "Now failure notifications are loud...", reply_markup=testing_managing)
 
 
-# Not to detect defects command (only scheduled notifications)
-@dp.message_handler(Text(equals=["Get only scheduled notifications", "/get_scheduled"]))
-async def stop_defects(message: types.Message):
+# Not to detect failures command (only scheduled notifications)
+@dp.message_handler(Text(equals=["Get only scheduled notifications"]))
+async def stop_failure(message: types.Message):
 
     db.update_defects_detect(user_id=message.from_user.id, detect_failures=False)
     await message.answer(
         "Now you will only receive scheduled notifications...", reply_markup=testing_managing)
 
 
-# Detect defects command (all notifications)
+# Detect failures command (all notifications)
 @dp.message_handler(Text(equals=["Get all notifications", "/get_all"]))
-async def start_defects(message: types.Message):
+async def start_failures(message: types.Message):
 
     db.update_defects_detect(user_id=message.from_user.id, detect_failures=True)
     await message.answer(
-        "Now you will also receive notifications about possible defects...", reply_markup=testing_managing)
+        "Now you will also receive notifications about failures...", reply_markup=testing_managing)
 
 
 async def check_tests(T):
@@ -335,129 +333,106 @@ async def check_tests(T):
             Column structure by index:
             0 - id
             1 - user_id (chat_id)
-            2 - status (watching or not)
-            3 - stream (stream_link)
+            2 - status (testing or not)
+            3 - my_path (path to pytest folder)
             4 - notifications_period (in what time next notification appears independently on result)
-            5 - predictions_since_last (number of predictions made since last prediction)
-            6 - defects_period (in what time next notification about defect appears if last one was about defect as well)
-            7 - defects_since_last (number of defects occured since last defect)
-            8 - detect_defects (True if you want to get notifications when defects occur)
-            9 - defects_mute (Mutes defects notifications)
-            10 - connection_errors (Counts connection errors (in a row only))
+            5 - checks_since_last (number of checks made since last check)
+            6 - failures_period (in what time next notification about failure appears if last one was about failure as well)
+            7 - failures_since_last (number of failures occured since last failure)
+            8 - detect_failures (True if you want to get notifications when failures occur)
+            9 - failure_mute (Mutes failures notifications)
             """
 
-            stream_link = user[3]
 
-            # get frame from stream
-            cap = cv2.VideoCapture(stream_link)
-            ret, frame = cap.read()
+            # if failure detection needed
+            if user[8]:
 
-            if ret and frame is not None:
+                '''if we want to get all notifications, 
+                then we need check tests state every T seconds'''
+                is_ok, str_results = parse(user[3])
+                print(is_ok, str_results)
+                print(is_ok)
+                print(user[5], user[4])
+                print(user[7], user[6])
 
-                # No connection errors
-                db.update_connection_errors(user_id=user[1], connection_errors=0)
+                # Scheduled notifications
+                if user[5] * T >= user[4]:
 
-                # if video stream active, then continue detection
-                if user[8]:
+                    # await bot.send_message(
+                    #     user[1],
+                    #     f'Sheduled response:',
+                    #     disable_notification=True
+                    # )
+                    print(str_results)
+                    await bot.send_message(user[1], str_results, parse_mode="Markdown")
 
-                    '''if we want to get all notifications, 
-                    then we need check image for defects every T seconds'''
-                    verdict, prob_yes_defects = get_prediction(img=frame, thresh=Q)
 
-                    # Scheduled notifications
-                    if user[5] * T >= user[4]:
-
-                        # load photo to memory and push it to bot
-                        bio = BytesIO()
-                        bio.name = 'image.jpeg'
-                        frame = np.flip(frame, axis=-1)
-                        image = imget(frame)
-                        image.save(bio, 'JPEG')
-                        bio.seek(0)
-
-                        await bot.send_photo(
-                            user[1],
-                            photo=bio,
-                            caption=verdict + f'{prob_yes_defects * 100:.4f}%',
-                            disable_notification=True
-                        )
-                        # if message is sent, then we start counting predictions again
-                        db.update_checks_since_last(user_id=user[1], checks_since_last=1)
-                    else:
-                        # if time has not passed, then we increase predictions quantity
-                        db.update_checks_since_last(user_id=user[1], checks_since_last=user[5] + 1)
-
-                    # Defects notifications
-                    if user[7] * T >= user[6] and prob_yes_defects >= Q:
-                        print(f"defects! {user[1]}")
-                        # load photo to memory and push it to bot
-                        bio = BytesIO()
-                        bio.name = 'image.jpeg'
-                        frame = np.flip(frame, axis=-1)
-                        image = imget(frame)
-                        image.save(bio, 'JPEG')
-                        bio.seek(0)
-
-                        await bot.send_photo(
-                            user[1],
-                            photo=bio,
-                            caption=verdict + f'{prob_yes_defects * 100:.4f}%',
-                            disable_notification=user[9]
-                        )
-                        # if message is sent, then we start counting defects again
-                        db.update_failures_since_last(user_id=user[1], failures_since_last=1)
-
-                    elif prob_yes_defects >= Q:
-                        # if current is with defects, then we increase its quantity
-                        db.update_failures_since_last(user_id=user[1], failures_since_last=user[7] + 1)
-                    else:
-                        # if current is without defects, then we start counting them again
-                        db.update_failures_since_last(user_id=user[1], failures_since_last=1)
+                    # if message is sent, then we start counting number of checks again
+                    db.update_checks_since_last(user_id=user[1], checks_since_last=1)
                 else:
+                    # if time has not passed, then we increase number of checks
+                    db.update_checks_since_last(user_id=user[1], checks_since_last=user[5] + 1)
 
-                    '''if only scheduled notifications needed, 
-                    then get predictions only when needed time is gone'''
-                    if user[5] * T >= user[4]:
-                        verdict, prob_yes_defects = get_prediction(img=frame, thresh=Q)
-                        # load photo to memory and push it to bot
-                        bio = BytesIO()
-                        bio.name = 'image.jpeg'
-                        frame = np.flip(frame, axis=-1)
-                        image = imget(frame)
-                        image.save(bio, 'JPEG')
-                        bio.seek(0)
+                # Failure notifications
+                if user[7] * T >= user[6] and is_ok == 0:
+                    print(f"Failure detected! {user[1]}"
+                          f"Message: {str_results}, {is_ok}")
 
-                        await bot.send_photo(
-                            user[1],
-                            photo=bio,
-                            caption=verdict + f'{prob_yes_defects * 100:.4f}%',
-                            disable_notification=True
-                        )
-                        db.update_checks_since_last(user_id=user[1], checks_since_last=1)
-                    else:
-                        db.update_checks_since_last(user_id=user[1], checks_since_last=user[5] + 1)
+                    # await bot.send_message(
+                    #     user[1],
+                    #     f'Failure detected:',
+                    #     disable_notification=user[9]
+                    # )
+                    print(str_results)
+                    await bot.send_message(user[1], str_results, parse_mode="Markdown")
+                    # if message is sent, then we start counting failures again
+                    db.update_failures_since_last(user_id=user[1], failures_since_last=1)
 
-            elif not ret and user[10] + 1 < CONNECT_ERRORS_THRESH:
-
-                '''if stream error, but its quantity is less than CONNECT_ERRORS_THRESH 
-                then continue detection because its "fake" error'''
-                db.update_connection_errors(user_id=user[1], connection_errors=user[10] + 1)
+                elif is_ok == 0:
+                    # if current check is with failures, then we increase its quantity
+                    db.update_failures_since_last(user_id=user[1], failures_since_last=user[7] + 1)
+                else:
+                    # if current is without failures, then we start counting them again
+                    db.update_failures_since_last(user_id=user[1], failures_since_last=1)
 
             else:
 
-                '''if video stream not active, notify user'''
-                db.update_status(user_id=user[1], status=False)
-                db.update_connection_errors(user_id=user[1], connection_errors=0)
-                await bot.send_message(
-                    user[1],
-                    text="Reconnect your stream, something went wrong...",
-                    reply_markup=rewritePath_editPeriods_testing_help
-                )
+                '''if only scheduled notifications needed, 
+                then check tests only when needed time is gone'''
+                if user[5] * T >= user[4]:
+
+                    is_ok, str_results = parse(user[3])
+                    # await bot.send_message(
+                    #     user[1],
+                    #     f'Sheduled response',
+                    #     disable_notification=True
+                    # )
+                    await bot.send_message(user[1], str_results, parse_mode="Markdown")
+
+                    db.update_checks_since_last(user_id=user[1], checks_since_last=1)
+                else:
+                    db.update_checks_since_last(user_id=user[1], checks_since_last=user[5] + 1)
+
+
+
+
+async def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format=u'%(filename)s:%(lineno)d #%(levelname)-8s [%(asctime)s] - %(name)s - %(message)s',
+    )
+    try:
+        loop = asyncio.get_event_loop()
+        loop.create_task(check_tests(T))
+        await dp.start_polling()
+    finally:
+        await dp.storage.close()
+        await dp.storage.wait_closed()
+        await bot.session.close()
 
 
 if __name__ == '__main__':
-    # create event loop
-    loop = asyncio.get_event_loop()
-    loop.create_task(check_tests(T))
-    executor.start_polling(dp, skip_updates=True)
-
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logging.error("Bot stopped!")

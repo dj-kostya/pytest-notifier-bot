@@ -1,8 +1,6 @@
--f https://download.pytorch.org/whl/torch_stable.html
-torch==1.9.0+cpu
-torchvision==0.10.0+cpu 
-aiogram==2.14.3
-asyncio
-numpy==1.20.3
-opencv-python-headless==4.2.0.32
+aiogram
+numpy
+pandas
+pytest
 python-dotenv
+pytest-json-report

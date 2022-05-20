@@ -1,4 +1,8 @@
 ignore
+venv
 .idea
 *.env
 *.db
+report.html
+pytest_handling.py
+test2.py
