@@ -2,6 +2,7 @@
 import tempfile
 from os import path
 from pytest_handling import tests_passed, parse_results
+from json_parser import parse
 
 from config import TOKEN
 
@@ -348,7 +349,7 @@ async def check_tests(T):
 
                 '''if we want to get all notifications, 
                 then we need check tests state every T seconds'''
-                is_ok, str_results = tests_passed(user[3])
+                is_ok, str_results = parse(user[3])
                 print(is_ok, str_results)
                 print(is_ok)
                 print(user[5], user[4])
@@ -400,7 +401,7 @@ async def check_tests(T):
                 then check tests only when needed time is gone'''
                 if user[5] * T >= user[4]:
 
-                    is_ok, str_results = tests_passed(user[3])
+                    is_ok, str_results = parse(user[3])
                     # await bot.send_message(
                     #     user[1],
                     #     f'Sheduled response',
