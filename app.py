@@ -1,7 +1,5 @@
 # Imports
-import tempfile
 from os import path
-from pytest_handling import tests_passed, parse_results
 from json_parser import parse
 
 from config import TOKEN
