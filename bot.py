@@ -1,17 +1,17 @@
 # Imports
 from os import path
-from json_parser import parse
+from functional.pytest_results_parser import pytest_results
 
-from config import TOKEN
+from config.env_config import TOKEN
 
-from keyboards import set_up_path, testing_managing, path_periods_testing_help
-from states import PytestPath, Notification, Failure
+from keyboards.keyboards import set_up_path, testing_managing, path_periods_testing_help
+from config.states import PytestPath, Notification, Failure
 
 import logging
 import asyncio
 
-from create_db import create_database
-from sqlite import SQLiteDatabase
+from config.database_config.initialize_database import create_database
+from config.database_config.sqlite_database_class import SQLiteDatabase
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.dispatcher import FSMContext
@@ -350,7 +350,7 @@ async def check_tests(period):
 
                 '''if we want to get all notifications,
                 then we need check tests state every T seconds'''
-                is_ok, str_results = parse(user[3])
+                is_ok, str_results = pytest_results(user[3])
                 print(is_ok, str_results)
                 print(is_ok)
                 print(user[5], user[4])
@@ -390,7 +390,7 @@ async def check_tests(period):
                 then check tests only when needed time is gone'''
                 if user[5] * period >= user[4]:
 
-                    is_ok, str_results = parse(user[3])
+                    is_ok, str_results = pytest_results(user[3])
                     await bot.send_message(user[1], str_results, parse_mode='Markdown')
 
                     db.update_checks_since_last(user_id=user[1], checks_since_last=1)

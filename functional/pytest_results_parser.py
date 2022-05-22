@@ -2,10 +2,10 @@ import pytest
 import pandas as pd
 
 
-def parse(my_path):
+def pytest_results(my_path):
 
     pytest.main(['--json-report', f'--rootdir={my_path}'])
-    data = pd.read_json('.report.json', lines=True, encoding='utf8')
+    data = pd.read_json('../.report.json', lines=True, encoding='utf8')
     result = ''
     for test in range(len(data['tests'][0])):
         if data['tests'][0][test]['outcome'] == 'failed':
@@ -25,4 +25,4 @@ Comment:
 
 
 if __name__ == '__main__':
-    res = parse('pytest/')
+    res = pytest_results('../pytest/')
