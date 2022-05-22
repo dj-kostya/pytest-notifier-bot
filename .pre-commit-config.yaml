@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.3.0
+    hooks:
+      - id: check-json
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: debug-statements
+      - id: double-quote-string-fixer
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: requirements-txt-fixer
+
+  - repo: local
+    hooks:
+      - id: wemake_lint
+        name: wemake_lint
+        entry: flake8 dirty_code
+        language: system
+        types: [ python ]
