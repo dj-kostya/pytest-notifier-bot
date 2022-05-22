@@ -15,6 +15,7 @@ repos:
     hooks:
       - id: wemake_lint
         name: wemake_lint
-        entry: flake8 app.py
-        language: system
+        args: ["--config=setup.cfg"]
+        entry: flake8 app
+        language: python
         types: [ python ]
