@@ -16,4 +16,3 @@ class Notification(StatesGroup):
 # state for saving failure period info
 class Failure(StatesGroup):
     failure_period = State()
-

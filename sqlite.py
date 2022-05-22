@@ -11,7 +11,7 @@ class SQLiteDatabase:
     # get list of active watchers
     def get_users(self, status=True):
         with self.connection:
-            sql = "SELECT * FROM `users` WHERE `status` = ?"
+            sql = 'SELECT * FROM `users` WHERE `status` = ?'
             return self.cursor.execute(sql, (status,)).fetchall()
 
     # check if person exists in db
@@ -24,7 +24,8 @@ class SQLiteDatabase:
     # add watcher (watching status)
     def add_user(self, user_id, status=True, my_path='text'):
         with self.connection:
-            return self.cursor.execute("INSERT INTO `users` (`user_id`, `status`, `my_path`) VALUES(?,?,?)", (user_id, status, my_path))
+            return self.cursor.execute('INSERT INTO `users` (`user_id`, `status`, `my_path`) VALUES(?,?,?)',
+                                       (user_id, status, my_path))
 
     # update watching status and path
     def update_path(self, user_id, status, my_path):
@@ -44,7 +45,7 @@ class SQLiteDatabase:
                           `checks_since_last` = ? ,
                           `failures_since_last` = ? ,
                           `detect_failures` = ? ,
-                          `failure_mute` = ? 
+                          `failure_mute` = ?
                       WHERE `user_id` = ?'''
             return self.cursor.execute(sql, (status, checks_since_last,
                                              failures_since_last, detect_failures,
@@ -80,7 +81,7 @@ class SQLiteDatabase:
     def update_defects_detect(self, user_id, detect_failures):
         with self.connection:
             sql = ''' UPDATE `users`
-                      SET `detect_failures` = ? 
+                      SET `detect_failures` = ?
                       WHERE `user_id` = ?'''
             return self.cursor.execute(sql, (detect_failures, user_id))
 
@@ -88,7 +89,7 @@ class SQLiteDatabase:
     def update_checks_since_last(self, user_id, checks_since_last):
         with self.connection:
             sql = ''' UPDATE `users`
-                      SET `checks_since_last` = ? 
+                      SET `checks_since_last` = ?
                       WHERE `user_id` = ?'''
             return self.cursor.execute(sql, (checks_since_last, user_id))
 
@@ -96,7 +97,7 @@ class SQLiteDatabase:
     def update_failures_since_last(self, user_id, failures_since_last):
         with self.connection:
             sql = ''' UPDATE `users`
-                      SET `failures_since_last` = ? 
+                      SET `failures_since_last` = ?
                       WHERE `user_id` = ?'''
             return self.cursor.execute(sql, (failures_since_last, user_id))
 
@@ -105,9 +106,7 @@ class SQLiteDatabase:
         with self.connection:
             sql = 'SELECT `my_path` FROM `users` WHERE `user_id` = ?'
             result = self.cursor.execute(sql, (user_id,)).fetchall()
-            print(result[0][0])
             return result[0][0]
-
 
     # close db connection
     def close(self):

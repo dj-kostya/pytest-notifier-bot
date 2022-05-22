@@ -2,5 +2,5 @@ aiogram
 numpy
 pandas
 pytest
-python-dotenv
 pytest-json-report
+python-dotenv

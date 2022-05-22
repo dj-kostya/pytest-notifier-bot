@@ -1,15 +1,12 @@
 import sqlite3
-from sqlite3 import Error
 
 
 def create_connection(db_file):
     """ create a database connection to a SQLite database """
-    conn = None
     try:
-        conn = sqlite3.connect(db_file)
-        return conn
-    except Error as e:
-        print(e)
+        return sqlite3.connect(db_file)
+    except sqlite3.Error as e:
+        return e
 
 
 def create_table(conn, create_table_sql):
@@ -21,8 +18,8 @@ def create_table(conn, create_table_sql):
     try:
         c = conn.cursor()
         c.execute(create_table_sql)
-    except Error as e:
-        print(e)
+    except sqlite3.Error as e:
+        return e
 
 
 def create_database(database_name):
@@ -31,20 +28,20 @@ def create_database(database_name):
     sql_create_users_table = """ CREATE TABLE IF NOT EXISTS users (
     id                     INTEGER       PRIMARY KEY AUTOINCREMENT,
     user_id                VARCHAR (255) NOT NULL,
-    status                 BOOLEAN       DEFAULT (TRUE) 
+    status                 BOOLEAN       DEFAULT (TRUE)
                                          NOT NULL,
     my_path                TEXT,
-    notifications_period   INTEGER       DEFAULT (300) 
+    notifications_period   INTEGER       DEFAULT (300)
                                          NOT NULL,
-    checks_since_last      INTEGER       DEFAULT (1) 
+    checks_since_last      INTEGER       DEFAULT (1)
                                          NOT NULL,
     failures_period        INTEGER       NOT NULL
                                          DEFAULT (30),
-    failures_since_last    INTEGER       DEFAULT (1) 
+    failures_since_last    INTEGER       DEFAULT (1)
                                          NOT NULL,
     detect_failures        BOOLEAN       NOT NULL
                                          DEFAULT (TRUE),
-    failure_mute           BOOLEAN       DEFAULT (FALSE) 
+    failure_mute           BOOLEAN       DEFAULT (FALSE)
                                          NOT NULL
 );
  """
@@ -58,6 +55,4 @@ def create_database(database_name):
         create_table(conn, sql_create_users_table)
         conn.close()
     else:
-        print("Error! cannot create the database connection.")
-
-
+        return 'Error! cannot create the database connection.'
