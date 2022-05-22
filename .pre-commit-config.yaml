@@ -15,6 +15,6 @@ repos:
     hooks:
       - id: wemake_lint
         name: wemake_lint
-        entry: flake8
+        entry: flake8 app
         language: system
         types: [ python ]
