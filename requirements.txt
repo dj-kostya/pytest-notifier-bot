@@ -4,3 +4,4 @@ pandas
 pytest
 pytest-json-report
 python-dotenv
+pre-commit

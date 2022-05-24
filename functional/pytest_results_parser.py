@@ -1,20 +1,31 @@
 import pytest
 import pandas as pd
-from config.env_config import PATH_TO_JSON_REPORT
+from pytest_jsonreport.plugin import JSONReport
+from data.constants import PATH_TO_JSON_REPORT, FAILED_STATUS
 
 
-def pytest_results(my_path):
+def pytest_results(pytest_root_dir):
 
-    pytest.main(['--json-report', f'--rootdir={my_path}'])
+    plugin = JSONReport()
+    pytest.main([f'--json-report-file=none', f'--rootdir={pytest_root_dir}'], plugins=[plugin])
+    plugin.save_report(PATH_TO_JSON_REPORT)
+
     data = pd.read_json(PATH_TO_JSON_REPORT, lines=True, encoding='utf8')
+    data = data['tests'][0]
     result = ''
-    for test in range(len(data['tests'][0])):
-        if data['tests'][0][test]['outcome'] == 'failed':
+    for test in range(len(data)):
+
+        test_status = data[test]['outcome']
+
+        if test_status == FAILED_STATUS:
+            failed_test_path = data[test]['call']['crash']['path']
+            failed_test_description = data[test]['call']['longrepr']
+
             text = f"""🔴Failed!
 Test:
-\t{data['tests'][0][test]['call']['crash']['path']}
+\t{failed_test_path}
 Comment:
-\t{data['tests'][0][test]['call']['longrepr']}
+\t{failed_test_description}
 
 
 """
@@ -26,4 +37,4 @@ Comment:
 
 
 if __name__ == '__main__':
-    res = pytest_results('../pytest/')
+    res = pytest_results('D:\\MyProjects\\WebTesterBot\\pytest')

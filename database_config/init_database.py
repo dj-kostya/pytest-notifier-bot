@@ -56,3 +56,7 @@ def create_database(database_name):
         conn.close()
     else:
         return 'Error! cannot create the database connection.'
+
+
+if __name__ == '__main__':
+    create_database("my.db")
