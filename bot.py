@@ -1,6 +1,7 @@
 from loader import bot, db
 from data import constants
-from handlers import dp, check_tests
+from handlers import dp
+from event_loop_tasks import check_tests
 import logging
 import asyncio
 

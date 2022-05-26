@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 from pytest_jsonreport.plugin import JSONReport
-from data.constants import PATH_TO_JSON_REPORT, FAILED_STATUS
+from data.constants import PATH_TO_JSON_REPORT, FAILED_STATUS, FAILED_TEST_DESCRIPTION, SUCCESSFUL_TESTS
 
 
 def pytest_results(pytest_root_dir):
@@ -21,18 +21,11 @@ def pytest_results(pytest_root_dir):
             failed_test_path = data[test]['call']['crash']['path']
             failed_test_description = data[test]['call']['longrepr']
 
-            text = f"""🔴Failed!
-Test:
-\t{failed_test_path}
-Comment:
-\t{failed_test_description}
-
-
-"""
-            result += text
+            result += FAILED_TEST_DESCRIPTION.format(failed_test_path=failed_test_path,
+                                                     failed_test_description=failed_test_description)
 
     if result == '':
-        return 1, '🟢 No failures'
+        return 1, SUCCESSFUL_TESTS
     return 0, result
 
 
