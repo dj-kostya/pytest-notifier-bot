@@ -9,10 +9,5 @@ class PytestPath(StatesGroup):
 
 
 # state for saving notifications period info
-class Notification(StatesGroup):
-    notifications_period = State()
-
-
-# state for saving failure period info
-class Failure(StatesGroup):
-    failure_period = State()
+class Period(StatesGroup):
+    period = State()

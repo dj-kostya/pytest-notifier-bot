@@ -1,12 +1,6 @@
 from data import constants as const
-from keyboards import keyboards as keyboards_markup
-from loader import dp, db
-
-
-# if user not in db, then add
-def register_user(user_id):
-    if not db.user_exists(user_id):
-        db.add_user(user_id=user_id, status=False)
+import keyboards as keyboards_markup
+from loader import dp
 
 
 async def time_out_of_bounds(message, state):
@@ -15,7 +9,7 @@ async def time_out_of_bounds(message, state):
 
     await message.answer(
         text=text,
-        reply_markup=keyboards_markup.path_periods_testing_help,
+        reply_markup=keyboards_markup.out_test_managing,
         parse_mode='Markdown'
     )
     dp.current_state(user=message.from_user.id)

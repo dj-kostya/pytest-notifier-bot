@@ -10,7 +10,7 @@ set_up_path = ReplyKeyboardMarkup(
     one_time_keyboard=True
 )
 
-testing_managing = ReplyKeyboardMarkup(
+in_test_managing = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text='Unmute failure notifications'),
@@ -28,7 +28,7 @@ testing_managing = ReplyKeyboardMarkup(
     one_time_keyboard=False
 )
 
-path_periods_testing_help = ReplyKeyboardMarkup(
+out_test_managing = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text='Reset path'),

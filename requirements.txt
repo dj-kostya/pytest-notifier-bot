@@ -1,7 +1,7 @@
 aiogram
 numpy
 pandas
+pre-commit
 pytest
 pytest-json-report
 python-dotenv
-pre-commit

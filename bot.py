@@ -1,6 +1,6 @@
-from loader import bot
+from loader import bot, db
 from data import constants
-from database_config import init_database
+from handlers import dp, check_tests
 import logging
 import asyncio
 
@@ -14,11 +14,9 @@ async def main():
         await dp.storage.close()
         await dp.storage.wait_closed()
         await bot.session.close()
+        db.close_session()
 
 if __name__ == '__main__':
-    from handlers import dp, check_tests
-    init_database.create_database(constants.PATH_TO_DATABASE)
-
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
